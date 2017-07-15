@@ -3,8 +3,9 @@
 #include <cstddef>
 #include <cassert>
 #include <unordered_map>
+#include <list>
 #include <memory>
-#include <functional>
+#include <algorithm>
 
 namespace sc {
 
@@ -15,7 +16,7 @@ namespace sc {
         {
         public:
             Cache(std::size_t totalCost = 100)
-                : m_TotalCost(totalCost)
+                : m_MaxCost(totalCost)
             {}
 
             ValuePtr putValue(Key const& key, Value * v, std::size_t cost = 1)
@@ -23,7 +24,7 @@ namespace sc {
                 return addValueImpl(key, [&v]{ return ValuePtr(v); }, cost);
             }
 
-            ValuePtr makeValue(Key const& key, std::size_t cost= 1)
+            ValuePtr makeValue(Key const& key, std::size_t cost = 1)
             {
                 return addValueImpl(key, maker, cost);
             }
@@ -34,10 +35,11 @@ namespace sc {
                 auto it = m_Values.find(key);
                 if (it != std::end(m_Values))
                 {
-                    result = it->second.value;
-                    m_CurrentCost -= it->second.cost;
-
+                    result = it->second;
                     m_Values.erase(it);
+
+                    m_Costs.erase(std::find_if(std::begin(m_Costs), std::end(m_Costs),
+                                               [&](auto && v) { return v.key == key; }));
                 }
 
                 return result;
@@ -45,43 +47,59 @@ namespace sc {
 
             std::size_t totalCost() const
             {
-                return m_TotalCost;
+                return m_MaxCost;
             }
 
             void setTotalCost(std::size_t totalCost)
             {
-                m_TotalCost = totalCost;
+                m_MaxCost = totalCost;
             }
 
         private: // Types
-            struct ValueData
+            struct KeyCost
             {
+                Key key;
                 std::size_t cost;
-                ValuePtr value;
             };
 
         private: // Functions
             template <class F>
             ValuePtr addValueImpl(Key const& key, F func, std::size_t cost)
             {
-                m_CurrentCost += cost;
+                if (cost > m_MaxCost)
+                    return nullptr;
 
-                // TODO:
-                // if (m_CurrentCost >= m_Costs) cleanup...
+                freeSpace(cost);
 
-                if (m_Values.find(key) != std::end(m_Values))
-                    m_Values.erase(key);
-
-                auto result = m_Values.emplace(key, ValueData{cost, func()});
+                m_Values.erase(key);
+                auto result = m_Values.emplace(key, func());
                 assert(result.second);
 
-                return result.first->second.value;
+                m_Costs.emplace_back(KeyCost{key, cost});
+                m_CurrentCost += cost;
+
+                return result.first->second;
+            }
+
+            void freeSpace(std::size_t cost)
+            {
+                std::size_t newCost = cost + m_CurrentCost;
+                while (newCost > m_MaxCost) {
+                    assert(!m_Costs.empty());
+
+                    KeyCost cost = m_Costs.front();
+                    m_Costs.pop_front();
+
+                    m_Values.erase(cost.key);
+                    newCost -= cost.cost;
+                }
             }
 
         private:
-            std::size_t m_TotalCost;
+            std::size_t m_MaxCost;
             std::size_t m_CurrentCost;
-            std::unordered_map<Key, ValueData> m_Values;
+            std::unordered_map<Key, ValuePtr> m_Values;
+            std::list<KeyCost> m_Costs;
         };
 
     } // namespace details
