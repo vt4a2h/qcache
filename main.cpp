@@ -17,6 +17,13 @@ int main()
     auto v2 = k.takeValue(4);
     std::cout << "v3: " << *v2 << std::endl;
 
+    k.removeValue(3);
+
+    auto v3 = k.makeValue(5);
+    *v3 = 10;
+
+    auto v3_3 = k[5];
+    k.clear();
 
     return 0;
 }

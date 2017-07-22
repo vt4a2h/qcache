@@ -6,6 +6,7 @@
 #include <list>
 #include <memory>
 #include <algorithm>
+#include <functional>
 
 namespace sc {
 
@@ -15,52 +16,30 @@ namespace sc {
         class Cache
         {
         public:
-            Cache(std::size_t totalCost = 100)
-                : m_MaxCost(totalCost)
-            {}
+            Cache(std::size_t maxCost = 100);
 
-            ValuePtr putValue(Key const& key, Value * v, std::size_t cost = 1)
-            {
-                return addValueImpl(key, [&v]{ return ValuePtr(v); }, cost);
-            }
+            ValuePtr putValue(Key const& key, Value * v, std::size_t cost = 1);
+            ValuePtr makeValue(Key const& key, std::size_t cost = 1);
 
-            ValuePtr makeValue(Key const& key, std::size_t cost = 1)
-            {
-                return addValueImpl(key, maker, cost);
-            }
+            ValuePtr takeValue(Key const& key);
+            void removeValue(Key const& key);
 
-            ValuePtr takeValue(Key const& key)
-            {
-                ValuePtr result;
-                auto it = m_Values.find(key);
-                if (it != std::end(m_Values))
-                {
-                    result = it->second;
-                    m_Values.erase(it);
+            ValuePtr operator[] (Key const& key) const;
 
-                    m_Costs.erase(std::find_if(std::begin(m_Costs), std::end(m_Costs),
-                                               [&](auto && v) { return v.key == key; }));
-                }
+            std::size_t totalCost() const;
+            void setTotalCost(std::size_t totalCost);
 
-                return result;
-            }
-
-            std::size_t totalCost() const
-            {
-                return m_MaxCost;
-            }
-
-            void setTotalCost(std::size_t totalCost)
-            {
-                m_MaxCost = totalCost;
-            }
+            void clear();
 
         private: // Types
             struct KeyCost
             {
-                Key key;
+                std::reference_wrapper<const Key> key;
                 std::size_t cost;
             };
+
+            using ValuesMap = std::unordered_map<Key, ValuePtr>;
+            using CostsList = std::list<KeyCost>;
 
         private: // Functions
             template <class F>
@@ -69,39 +48,118 @@ namespace sc {
                 if (cost > m_MaxCost)
                     return nullptr;
 
-                freeSpace(cost);
-
+                freeSpace(m_MaxCost - cost);
                 m_Values.erase(key);
+
                 auto result = m_Values.emplace(key, func());
                 assert(result.second);
 
-                m_Costs.emplace_back(KeyCost{key, cost});
-                m_CurrentCost += cost;
+                m_Costs.emplace_back(KeyCost{result.first->first, cost});
+                m_TotalCost += cost;
 
                 return result.first->second;
             }
 
-            void freeSpace(std::size_t cost)
+            void removeImpl(typename ValuesMap::iterator it)
             {
-                std::size_t newCost = cost + m_CurrentCost;
-                while (newCost > m_MaxCost) {
+                assert(it != std::end(m_Values));
+                auto costsIt = std::find_if(std::begin(m_Costs), std::end(m_Costs),
+                                            [&](auto && v) { return v.key == it->first; });
+                if (costsIt != std::end(m_Costs)) {
+                    m_TotalCost -= costsIt->cost;
+                    m_Costs.erase(costsIt);
+                }
+
+                m_Values.erase(it);
+            }
+
+            void freeSpace(std::size_t newMaxCost)
+            {
+                while (m_TotalCost > newMaxCost) {
                     assert(!m_Costs.empty());
 
                     KeyCost cost = m_Costs.front();
                     m_Costs.pop_front();
 
                     m_Values.erase(cost.key);
-                    newCost -= cost.cost;
+                    m_TotalCost -= cost.cost;
                 }
             }
 
         private:
             std::size_t m_MaxCost;
-            std::size_t m_CurrentCost;
-            std::unordered_map<Key, ValuePtr> m_Values;
-            std::list<KeyCost> m_Costs;
+            std::size_t m_TotalCost;
+            ValuesMap m_Values;
+            CostsList m_Costs;
         };
 
+        template<class Key, class Value, class ValuePtr, auto maker>
+        Cache<Key, Value, ValuePtr, maker>::Cache(std::size_t maxCost)
+            : m_MaxCost(maxCost)
+            , m_TotalCost(0)
+        {}
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        ValuePtr Cache<Key, Value, ValuePtr, maker>::putValue(const Key &key, Value *v, std::size_t cost)
+        {
+            return addValueImpl(key, [&v]{ return ValuePtr(v); }, cost);
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        ValuePtr Cache<Key, Value, ValuePtr, maker>::makeValue(const Key &key, std::size_t cost)
+        {
+            return addValueImpl(key, maker, cost);
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        ValuePtr Cache<Key, Value, ValuePtr, maker>::takeValue(const Key &key)
+        {
+            ValuePtr result;
+
+            auto it = m_Values.find(key);
+            if (it != std::end(m_Values)) {
+                result = it->second;
+                removeImpl(it);
+            }
+
+            return result;
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        void Cache<Key, Value, ValuePtr, maker>::removeValue(const Key &key)
+        {
+            auto it = m_Values.find(key);
+            if (it != std::end(m_Values))
+                removeImpl(it);
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        ValuePtr Cache<Key, Value, ValuePtr, maker>::operator[](const Key &key) const
+        {
+            auto it = m_Values.find(key);
+            return it != std::cend(m_Values) ? it->second : ValuePtr();
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        std::size_t Cache<Key, Value, ValuePtr, maker>::totalCost() const
+        {
+            return m_MaxCost;
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        void Cache<Key, Value, ValuePtr, maker>::setTotalCost(std::size_t totalCost)
+        {
+            m_MaxCost = totalCost;
+            freeSpace(m_MaxCost);
+        }
+
+        template<class Key, class Value, class ValuePtr, auto maker>
+        void Cache<Key, Value, ValuePtr, maker>::clear()
+        {
+            m_Values.clear();
+            m_Costs.clear();
+            m_TotalCost = 0;
+        }
     } // namespace details
 
     template<class Key, class Value>
