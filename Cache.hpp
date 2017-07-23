@@ -25,7 +25,7 @@ namespace sc {
         Cache(std::size_t maxCost = 100, Maker maker = std::make_shared<Value>);
 
         /// Add value to the cache
-        ValuePtr putValue(Key const& key, Value * v, std::size_t cost = 1);
+        ValuePtr putValue(Key const& key, Value *v, std::size_t cost = 1);
         /// Create value and put it to the cache
         ValuePtr makeValue(Key const& key, std::size_t cost = 1);
 
@@ -120,19 +120,19 @@ namespace sc {
     {}
 
     template<class Key, class Value, class ValuePtr, class Maker>
-    ValuePtr Cache<Key, Value, ValuePtr, Maker>::putValue(const Key &key, Value *v, std::size_t cost)
+    ValuePtr Cache<Key, Value, ValuePtr, Maker>::putValue(Key const& key, Value *v, std::size_t cost)
     {
         return addValueImpl(key, [&v]{ return ValuePtr(v); }, cost);
     }
 
     template<class Key, class Value, class ValuePtr, class Maker>
-    ValuePtr Cache<Key, Value, ValuePtr, Maker>::makeValue(const Key &key, std::size_t cost)
+    ValuePtr Cache<Key, Value, ValuePtr, Maker>::makeValue(Key const& key, std::size_t cost)
     {
         return addValueImpl(key, m_Maker, cost);
     }
 
     template<class Key, class Value, class ValuePtr, class Maker>
-    ValuePtr Cache<Key, Value, ValuePtr, Maker>::takeValue(const Key &key)
+    ValuePtr Cache<Key, Value, ValuePtr, Maker>::takeValue(Key const& key)
     {
         ValuePtr result;
 
@@ -146,7 +146,7 @@ namespace sc {
     }
 
     template<class Key, class Value, class ValuePtr, class Maker>
-    void Cache<Key, Value, ValuePtr, Maker>::removeValue(const Key &key)
+    void Cache<Key, Value, ValuePtr, Maker>::removeValue(Key const& key)
     {
         auto it = m_Values.find(key);
         if (it != std::end(m_Values))
@@ -154,7 +154,7 @@ namespace sc {
     }
 
     template<class Key, class Value, class ValuePtr, class Maker>
-    ValuePtr Cache<Key, Value, ValuePtr, Maker>::operator[](const Key &key) const
+    ValuePtr Cache<Key, Value, ValuePtr, Maker>::operator[](Key const& key) const
     {
         auto it = m_Values.find(key);
         return it != std::cend(m_Values) ? it->second : ValuePtr();
