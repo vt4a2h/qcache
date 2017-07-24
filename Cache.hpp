@@ -51,7 +51,7 @@ namespace sc {
     private: // Types
         struct KeyCost
         {
-            std::reference_wrapper<const Key> key;
+            Key key;
             std::size_t cost;
         };
 
@@ -66,15 +66,17 @@ namespace sc {
                 return nullptr;
 
             freeSpace(m_MaxCost - cost);
-            m_Values.erase(key);
 
-            auto result = m_Values.emplace(key, func());
-            assert(result.second);
+            auto it = m_Values.find(key);
+            if (it != std::end(m_Values))
+                removeImpl(it);
 
-            m_Costs.emplace_back(KeyCost{result.first->first, cost});
+            ValuePtr value(m_Values[key] = func());
+
+            m_Costs.emplace_back(KeyCost{key, cost});
             m_TotalCost += cost;
 
-            return result.first->second;
+            return value;
         }
 
         void removeImpl(typename ValuesMap::iterator it)
