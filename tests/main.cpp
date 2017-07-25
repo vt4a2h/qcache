@@ -55,8 +55,37 @@ TEST(CacheTest, GetElement)
     ASSERT_FALSE(!!cache["bar"]);
 }
 
-// TODO: add tests for max cost
+TEST(CacheTest, Resize)
+{
+    const std::size_t maxCost = 42;
+    const std::size_t extraElements = 10;
+
+    sc::Cache<std::size_t, double> cache(maxCost);
+    ASSERT_EQ(cache.maxCost(), maxCost);
+
+    for (std::size_t i = 0; i < maxCost + extraElements; ++i)
+    {
+        *cache.makeValue(i) = i * 2;
+    }
+    ASSERT_EQ(cache.elementsCount(), maxCost);
+    ASSERT_EQ(cache.totalCost()    , maxCost);
+
+    for (std::size_t i = 0; i < extraElements; ++i)
+    {
+       ASSERT_FALSE(!!cache[i]);
+    }
+
+    cache.setMaxCost(maxCost - 2);
+    ASSERT_EQ(cache.elementsCount(), maxCost - 2);
+    ASSERT_EQ(cache.totalCost()    , maxCost - 2);
+    for (std::size_t i = 0; i < extraElements + 2; ++i)
+    {
+       ASSERT_FALSE(!!cache[i]);
+    }
+}
+
 // TODO: add tests for genaral use case
+// TODO: add tests for custom maker and pointer type
 
 int main(int argc, char **argv)
 {

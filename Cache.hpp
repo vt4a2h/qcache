@@ -45,6 +45,9 @@ namespace sc {
         /// Cost of added elements
         std::size_t totalCost() const;
 
+        /// Elements count
+        std::size_t elementsCount() const;
+
         /// Clear cache
         void clear();
 
@@ -179,6 +182,12 @@ namespace sc {
     std::size_t Cache<Key, Value, ValuePtr, Maker>::totalCost() const
     {
         return m_TotalCost;
+    }
+
+    template<class Key, class Value, class ValuePtr, class Maker>
+    std::size_t Cache<Key, Value, ValuePtr, Maker>::elementsCount() const
+    {
+        return m_Values.size();
     }
 
     template<class Key, class Value, class ValuePtr, class Maker>
