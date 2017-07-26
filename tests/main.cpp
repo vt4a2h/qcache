@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#ifdef TEST_WITH_BOOST_SHARED_POINTER
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
+#endif
+
 #include "Cache.hpp"
 
 TEST(CacheTest, Create)
@@ -84,8 +89,43 @@ TEST(CacheTest, Resize)
     }
 }
 
-// TODO: add tests for genaral use case
-// TODO: add tests for custom maker and pointer type
+TEST(CacheTest, CustomMaker)
+{
+    int count = 0;
+    auto counter = [&count]{ return ++count, std::make_shared<double>(); };
+
+    using ExtendedCache = sc::Cache<std::size_t, double,
+                                   std::shared_ptr<double>,
+                                   decltype(counter)>;
+
+    const std::size_t maxCost = 10;
+    ExtendedCache cache(maxCost, counter);
+    for (std::size_t i = 0; i < maxCost; ++i)
+    {
+        *cache.makeValue(i) = i * 2;
+        ASSERT_TRUE(!!cache[i]);
+    }
+    ASSERT_EQ(cache.elementsCount(), maxCost);
+    ASSERT_EQ(cache.elementsCount(), count  );
+}
+
+#ifdef TEST_WITH_BOOST_SHARED_POINTER
+TEST(CacheTest, CustomSharedPointer)
+{
+    using BoostedCache = sc::Cache<std::size_t, double,
+                                   boost::shared_ptr<double>,
+                                   decltype(&boost::make_shared<double>)>;
+
+    const std::size_t maxCost = 10;
+    BoostedCache cache(maxCost, &boost::make_shared<double>);
+    for (std::size_t i = 0; i < maxCost; ++i)
+    {
+        *cache.makeValue(i) = i * 2;
+        ASSERT_TRUE(!!cache[i]);
+    }
+    ASSERT_EQ(cache.elementsCount(), maxCost);
+}
+#endif
 
 int main(int argc, char **argv)
 {

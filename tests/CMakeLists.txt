@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.0.0)
 
 project(Tests)
 
+add_definitions(-DTEST_WITH_BOOST_SHARED_POINTER)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -Werror -pedantic")
 
 set(HEADERS ../Cache.hpp)
